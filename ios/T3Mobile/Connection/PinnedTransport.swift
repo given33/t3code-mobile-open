@@ -67,15 +67,17 @@ final class PinnedTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
   func close() { session.invalidateAndCancel() }
   func urlSession(
     _ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    completionHandler: @escaping @MainActor @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
   ) {
-    policy.answer(challenge, completionHandler)
+    policy.answer(challenge) { disposition, credential in
+      Task { @MainActor in completionHandler(disposition, credential) }
+    }
   }
   func urlSession(
     _ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    completionHandler: @escaping @MainActor @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
   ) {
-    policy.answer(challenge, completionHandler)
+    urlSession(session, didReceive: challenge, completionHandler: completionHandler)
   }
   func urlSession(
     _ session: URLSession, task: URLSessionTask,
