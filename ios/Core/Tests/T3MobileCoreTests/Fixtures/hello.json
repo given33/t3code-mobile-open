@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "backend": "t3code",
+  "appVersion": "0.3.0",
+  "host": {
+    "id": "0ad089db-291f-44ec-bd6c-c3a99c1c7e9e",
+    "name": "Desk",
+    "role": "local"
+  },
+  "fingerprint": "3tC6Xw3VdBV689zj6k4Rmrt4rFD9P9k5nBSJb2Tc_So"
+}

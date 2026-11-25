@@ -1,0 +1,24 @@
+[Unit]
+Description=Persistent SSH connection for the Codex worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=t3-cloud
+Group=t3-cloud
+RuntimeDirectory=t3-cloud
+RuntimeDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/bin/ssh -F /etc/t3-cloud/ssh_config -fNT -o ControlMaster=yes -o ControlPersist=yes -S /run/t3-cloud/hk.mux codex-worker
+ExecStop=/usr/bin/ssh -F /etc/t3-cloud/ssh_config -S /run/t3-cloud/hk.mux -O exit codex-worker
+Restart=always
+RestartSec=2
+TimeoutStartSec=20
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

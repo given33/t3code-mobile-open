@@ -1,0 +1,27 @@
+{
+  "host": {
+    "id": "0ad089db-291f-44ec-bd6c-c3a99c1c7e9e",
+    "name": "Desk",
+    "role": "local"
+  },
+  "actions": false,
+  "terminal": false,
+  "family": {
+    "familyId": "family",
+    "role": "local",
+    "peer": {
+      "id": "peer",
+      "name": "Peer",
+      "displayName": "Cloud",
+      "role": "cloud",
+      "fingerprint": "XNJS-wzokyQ2-vjM0QQJgbie5K1rn-niorfnGqyyfNM",
+      "hosts": [
+        "example.com:3081"
+      ]
+    }
+  },
+  "ok": true,
+  "upstreamOk": true,
+  "environmentId": "test-env",
+  "serverTimeMs": 1795535251271
+}

@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "host": "127.0.0.1",
+  "port": 3081,
+  "name": "Workstation",
+  "role": "local",
+  "actions": false,
+  "terminal": false,
+  "taskSync": {"enabled": false, "role": "local"},
+  "extraHosts": ["203.0.113.10:3081"],
+  "tunnels": []
+}

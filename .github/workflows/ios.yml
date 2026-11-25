@@ -1,0 +1,21 @@
+name: iOS
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  client:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path ios/Core
+      - run: brew install xcodegen
+      - run: xcodegen generate --spec ios/project.yml
+      - run: xcodebuild build -project ios/T3Mobile.xcodeproj -scheme T3Mobile -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+      - run: bash scripts/build-ipa.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: T3Mobile-unsigned
+          path: |
+            build/T3Mobile-unsigned.ipa
+            build/T3Mobile-unsigned.ipa.sha256
+          if-no-files-found: error

@@ -1,0 +1,12 @@
+{
+  "familyId": "example-family",
+  "role": "local",
+  "peer": {
+    "id": "example-cloud",
+    "name": "Cloud",
+    "displayName": "云端",
+    "role": "cloud",
+    "fingerprint": "REPLACE_WITH_VERIFIED_PEER_SPKI_SHA256_PIN_",
+    "hosts": ["example.com:3081"]
+  }
+}

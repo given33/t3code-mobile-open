@@ -1,0 +1,40 @@
+{
+  "name": "t3-mobile-link",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "host.mjs",
+    "lib",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:plugin": "node ../scripts/pack-plugin.mjs"
+  },
+  "bundleDependencies": [
+    "qrcode-generator",
+    "ws"
+  ],
+  "dependencies": {
+    "qrcode-generator": "2.0.4",
+    "ws": "8.23.0"
+  },
+  "t3code": {
+    "plugin": {
+      "id": "t3-mobile-link",
+      "name": "T3 Mobile Link",
+      "version": "0.3.0",
+      "entry": "./host.mjs",
+      "panel": {
+        "title": "Mobile Link",
+        "uiPath": "/panel",
+        "description": "Pair iOS devices over pinned TLS and configure local/cloud family links."
+      }
+    }
+  }
+}

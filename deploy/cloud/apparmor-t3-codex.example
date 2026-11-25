@@ -1,0 +1,7 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Only the root-installed worker executable(s), never a writable directory.
+profile t3-codex-userns /opt/t3-codex/codex-resources/bwrap flags=(unconfined) {
+  userns,
+}

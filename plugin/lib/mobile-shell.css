@@ -1,0 +1,9 @@
+:root {
+  --t3m-keyboard-inset: 0px;
+  --t3m-keyboard-duration: 0ms;
+}
+body {
+  box-sizing: border-box;
+  padding-bottom: var(--t3m-keyboard-inset);
+  transition: padding-bottom var(--t3m-keyboard-duration) ease-out;
+}

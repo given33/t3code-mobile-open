@@ -1,0 +1,28 @@
+[Unit]
+Description=T3 Code (loopback only)
+After=network-online.target t3-hk-ssh-mux.service
+Wants=network-online.target t3-hk-ssh-mux.service
+
+[Service]
+User=t3-cloud
+Group=t3-cloud
+StateDirectory=t3-cloud
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/t3-cloud/workspace
+Environment=HOME=/var/lib/t3-cloud T3CODE_HOME=/var/lib/t3-cloud
+Environment=PATH=/opt/t3-cloud/bin:/usr/local/bin:/usr/bin:/bin
+Environment=T3_CODEX_EXEC_MODE=hk-ssh DO_NOT_TRACK=1
+EnvironmentFile=-/etc/t3-cloud/runtime.env
+ExecStart=/opt/t3-cloud/bin/node /opt/t3-cloud/dist/bin.mjs serve --host 127.0.0.1 --port 18371 --no-browser
+UMask=0077
+Restart=on-failure
+RestartSec=5
+MemoryAccounting=yes
+MemoryMax=768M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
