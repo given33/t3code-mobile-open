@@ -30,10 +30,9 @@ struct PinPolicy: Sendable {
     else { return false }
     return actual == fingerprint
   }
-  func answer(
-    _ challenge: URLAuthenticationChallenge,
-    _ finish: (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-  ) {
+  func decision(for challenge: URLAuthenticationChallenge)
+    -> (URLSession.AuthChallengeDisposition, URLCredential?)
+  {
     let space = challenge.protectionSpace
     let brackets = CharacterSet(charactersIn: "[]")
     guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust,
@@ -42,10 +41,9 @@ struct PinPolicy: Sendable {
         == endpoint.origin.host?.lowercased().trimmingCharacters(in: brackets),
       space.port == (endpoint.origin.port ?? 443), let trust = space.serverTrust, accepts(trust)
     else {
-      finish(.cancelAuthenticationChallenge, nil)
-      return
+      return (.cancelAuthenticationChallenge, nil)
     }
-    finish(.useCredential, URLCredential(trust: trust))
+    return (.useCredential, URLCredential(trust: trust))
   }
 }
 final class PinnedTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
@@ -65,19 +63,15 @@ final class PinnedTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
     session = URLSession(configuration: c, delegate: self, delegateQueue: nil)
   }
   func close() { session.invalidateAndCancel() }
-  func urlSession(
-    _ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping @MainActor @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-  ) {
-    policy.answer(challenge) { disposition, credential in
-      Task { @MainActor in completionHandler(disposition, credential) }
-    }
+  func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async
+    -> (URLSession.AuthChallengeDisposition, URLCredential?)
+  {
+    policy.decision(for: challenge)
   }
   func urlSession(
-    _ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping @MainActor @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-  ) {
-    urlSession(session, didReceive: challenge, completionHandler: completionHandler)
+    _ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge
+  ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+    policy.decision(for: challenge)
   }
   func urlSession(
     _ session: URLSession, task: URLSessionTask,

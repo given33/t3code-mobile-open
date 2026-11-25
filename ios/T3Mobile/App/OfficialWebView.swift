@@ -153,7 +153,8 @@ import WebKit
         completionHandler(.cancelAuthenticationChallenge, nil)
         return
       }
-      policy.answer(challenge, completionHandler)
+      let (disposition, credential) = policy.decision(for: challenge)
+      completionHandler(disposition, credential)
     }
     func webView(
       _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
@@ -273,7 +274,8 @@ import WebKit
         completionHandler(.cancelAuthenticationChallenge, nil)
         return
       }
-      policy.answer(challenge, completionHandler)
+      let (disposition, credential) = policy.decision(for: challenge)
+      completionHandler(disposition, credential)
     }
     func download(
       _ download: WKDownload, willPerformHTTPRedirection response: HTTPURLResponse,
