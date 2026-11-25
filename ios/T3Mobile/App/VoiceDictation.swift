@@ -63,11 +63,11 @@ import SwiftUI
       installedTap = true
       recognition = recognizer.recognitionTask(with: r) { [weak self] result, error in
         Task { @MainActor in
-          guard let self, generation == id else { return }
-          if let result { text = result.bestTranscription.formattedString }
+          guard let self, self.generation == id else { return }
+          if let result { self.text = result.bestTranscription.formattedString }
           if error != nil || result?.isFinal == true {
-            stop()
-            if error != nil { message = "听写已结束，可编辑已识别文字。" }
+            self.stop()
+            if error != nil { self.message = "听写已结束，可编辑已识别文字。" }
           }
         }
       }

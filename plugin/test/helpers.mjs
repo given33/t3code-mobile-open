@@ -7,12 +7,12 @@ import { once } from "node:events";
 import { pinnedAgent } from "../lib/pinned.mjs";
 import WebSocket from "ws";
 export function temp() {
-  const root = realpathSync(tmpdir()),
+  const root = realpathSync.native(tmpdir()),
     dir = mkdtempSync(join(root, "mobile-link-test-"));
   return {
     dir,
     clean() {
-      const actual = realpathSync(dir);
+      const actual = realpathSync.native(dir);
       if (
         dirname(actual) !== root ||
         !basename(actual).startsWith("mobile-link-test-")

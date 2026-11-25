@@ -329,9 +329,11 @@ import WebKit
     func previewController(_ controller: QLPreviewController, previewItemAt index: Int)
       -> QLPreviewItem
     { (previewURL ?? FileManager.default.temporaryDirectory) as NSURL }
-    func previewControllerDidDismiss(_ controller: QLPreviewController) {
-      if let previewURL { cleanup(previewURL) }
-      previewURL = nil
+    nonisolated func previewControllerDidDismiss(_ controller: QLPreviewController) {
+      Task { @MainActor in
+        if let url = self.previewURL { self.cleanup(url) }
+        self.previewURL = nil
+      }
     }
   }
 }
