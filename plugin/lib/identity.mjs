@@ -8,6 +8,7 @@ import {
   X509Certificate,
   createHash,
   createPrivateKey,
+  createPublicKey,
 } from "node:crypto";
 import { readState, writeState } from "./state.mjs";
 function der(tag, ...parts) {
@@ -24,10 +25,9 @@ function time(date) {
     ? der(0x17, Buffer.from(s.slice(2) + "Z"))
     : der(0x18, Buffer.from(s + "Z"));
 }
-function generate() {
-  const { publicKey, privateKey } = generateKeyPairSync("ec", {
-    namedCurve: "prime256v1",
-  });
+const DAY = 86_400_000;
+export function issueCertificate(privateKey, from, until) {
+  const publicKey = createPublicKey(privateKey);
   const alg = seq(der(6, hex("2a8648ce3d040302"))); // ecdsa-with-SHA256
   const name = seq(
     der(
@@ -37,15 +37,14 @@ function generate() {
   );
   const serial = randomBytes(16);
   serial[0] = serial[0] & 0x7f || 1;
-  const now = Date.now();
   const tbs = seq(
     der(0xa0, der(2, hex("02"))),
     der(2, serial),
     alg,
     name,
     seq(
-      time(new Date(now - 86400000)),
-      time(new Date(now + 5 * 365 * 86400000)),
+      time(new Date(from)),
+      time(new Date(until)),
     ),
     name,
     publicKey.export({ type: "spki", format: "der" }),
@@ -59,25 +58,28 @@ function generate() {
     alg,
     der(3, hex("00"), sign("sha256", tbs, privateKey)),
   );
-  return {
-    id: randomUUID(),
-    key: privateKey.export({ type: "pkcs8", format: "pem" }),
-    cert: new X509Certificate(cert).toString(),
-  };
+  return new X509Certificate(cert).toString();
 }
-export function identity(dir) {
+export function identity(dir, now = Date.now()) {
+  const from = now - 300_000; // five minutes of clock skew inside the 397-day lifetime
+  const issue = key => issueCertificate(key, from, from + 397 * DAY);
   let data = readState(dir, "identity.json");
   if (!data) {
-    data = generate();
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    data = { id: randomUUID(), key: privateKey.export({ type: "pkcs8", format: "pem" }),
+      cert: issue(privateKey) };
     writeState(dir, "identity.json", data);
   }
-  const x = new X509Certificate(data.cert);
-  if (
-    !x.verify(x.publicKey) ||
-    !x.checkPrivateKey(createPrivateKey(data.key)) ||
-    Date.parse(x.validTo) <= Date.now()
-  )
-    throw Error("Invalid or expired Mobile Link identity");
+  const key = createPrivateKey(data.key);
+  let x = new X509Certificate(data.cert);
+  if (key.asymmetricKeyDetails?.namedCurve !== "prime256v1" || !x.verify(x.publicKey) || !x.checkPrivateKey(key))
+    throw Error("Invalid Mobile Link identity");
+  const until = Date.parse(x.validTo);
+  if (until - now < 45 * DAY || until - Date.parse(x.validFrom) > 398 * DAY) {
+    data = { ...data, cert: issue(key) };
+    writeState(dir, "identity.json", data);
+    x = new X509Certificate(data.cert);
+  }
   const hash = createHash("sha256")
     .update(x.publicKey.export({ type: "spki", format: "der" }))
     .digest();

@@ -17,27 +17,29 @@ private struct HomeScreen: View {
   @State private var voiceID = UUID()
   var body: some View {
     VStack(spacing: 0) {
-      HStack {
+      HStack(spacing: 4) {
         Button {
           model.browser?.sidebar()
         } label: {
-          Image(systemName: "sidebar.left")
-        }.accessibilityLabel("切换网页侧栏").disabled(!model.ready)
-        Spacer()
-        deviceMenu
-        Spacer()
+          Image(systemName: "sidebar.left").frame(width: 44, height: 44).contentShape(Rectangle())
+        }
+        .tint(model.drawerOpen ? Color.accentColor : Color.primary)
+        .accessibilityLabel(model.drawerOpen ? "收起会话侧栏" : "打开会话侧栏")
+        .accessibilityValue(model.drawerOpen ? "展开" : "收起")
+        .disabled(!model.ready)
+        deviceMenu.frame(maxWidth: .infinity)
         Button {
           voiceID = model.session?.id ?? UUID()
           panel = .voice
         } label: {
-          Image(systemName: "waveform")
+          Image(systemName: "waveform").frame(width: 44, height: 44).contentShape(Rectangle())
         }.accessibilityLabel("设备听写").disabled(!model.ready)
         Button {
           panel = .details
         } label: {
-          Image(systemName: "slider.horizontal.3")
+          Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).contentShape(Rectangle())
         }.accessibilityLabel("连接设置")
-      }.font(.title3).buttonStyle(.borderless).padding(.horizontal).frame(minHeight: 48)
+      }.font(.title3).buttonStyle(.borderless).padding(.horizontal, 6).frame(height: 46)
       if let message = model.banner {
         HStack {
           Text(message).font(.footnote)
@@ -54,6 +56,7 @@ private struct HomeScreen: View {
         Color(uiColor: Theme.surface(model.bgBase, dark: model.dark))
         if let session = model.session {
           OfficialWebView(model: model, session: session).id(session.id)
+            .ignoresSafeArea(.all, edges: .bottom)
         }
         if model.selected != nil && (!model.ready || cover) {
           if let frame = model.resumeFrame {
@@ -82,7 +85,9 @@ private struct HomeScreen: View {
           }
         }
       }.frame(maxWidth: .infinity, maxHeight: .infinity)
-    }.ignoresSafeArea(.keyboard, edges: .bottom).preferredColorScheme(
+      .ignoresSafeArea(.all, edges: .bottom)
+    }.background(Color(uiColor: Theme.surface(model.bgBase, dark: model.dark)).ignoresSafeArea())
+    .ignoresSafeArea(.all, edges: .bottom).preferredColorScheme(
       model.dark.map { $0 ? .dark : .light }
     )
     .onAppear { model.foreground() }
@@ -158,11 +163,11 @@ private struct HomeScreen: View {
         VStack(alignment: .leading, spacing: 1) {
           Text(model.selected?.host.name ?? "未连接").font(.subheadline.bold()).lineLimit(1)
           if model.selected != nil {
-            Text(model.health[model.selectedID]?.label ?? "探测中").font(.caption2)
+            Text(model.health[model.selectedID]?.label ?? "探测中").font(.caption2).lineLimit(1)
           }
         }
         Image(systemName: "chevron.down").font(.caption)
-      }.padding(.horizontal, 12).padding(.vertical, 5).background(.thinMaterial, in: Capsule())
+      }.frame(minHeight: 44).padding(.horizontal, 10).frame(maxWidth: 208).background(.thinMaterial, in: Capsule())
     }
   }
 }

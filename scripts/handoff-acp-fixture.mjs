@@ -11,6 +11,16 @@ let pending,
 for await (const line of createInterface({ input: process.stdin })) {
   const { method, id, params } = JSON.parse(line);
   if (method === "session/prompt") {
+    if (process.argv[3] === "--mobile-ui") {
+      const update = fields => send({method:"session/update",params:{sessionId,update:fields}});
+      update({sessionUpdate:"tool_call", toolCallId:"qa-edit", title:"Edit sample.txt", kind:"edit", status:"in_progress",
+        locations:[{path:"sample.txt"}]});
+      update({sessionUpdate:"tool_call_update", toolCallId:"qa-edit", title:"Edit sample.txt", kind:"edit", status:"completed",
+        content:[{type:"diff", path:"sample.txt", oldText:"before\n", newText:"after\n"}]});
+      update({sessionUpdate:"agent_message_chunk",content:{type:"text",text:"Mobile QA result\n\n```js\nconst longLine = '" + "x".repeat(160) + "';\n```"}});
+      send({id,result:{stopReason:"end_turn"}});
+      continue;
+    }
     pending = id;
     marker(
       JSON.stringify(params.prompt).includes(

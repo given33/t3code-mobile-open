@@ -13,7 +13,10 @@ struct NodeHealth: Sendable {
 @MainActor final class AppModel: ObservableObject {
   @Published private(set) var hosts: [PairedHost] = []
   @Published private(set) var selectedID = ""
-  @Published private(set) var session: BrowserSession?
+  @Published private(set) var session: BrowserSession? {
+    didSet { if session?.id != oldValue?.id { drawerOpen = false } }
+  }
+  @Published private(set) var drawerOpen = false
   @Published private(set) var health: [String: NodeHealth] = [:]
   @Published private(set) var ready = false
   @Published private(set) var resumeFrame: UIImage?
@@ -93,28 +96,50 @@ struct NodeHealth: Sendable {
   }
   func pair(_ link: PairLink) async throws {
     guard loaded else { throw LinkError.response }
-    let choices = await withTaskGroup(of: Probe?.self) { group in
-      for e in link.endpoints {
+    let attempts = await withTaskGroup(of: (Int, Probe?, String?).self) { group in
+      for (index, e) in link.endpoints.enumerated() {
         group.addTask {
           let t = PinnedTransport(e, pin: link.pin)
           defer { t.close() }
-          guard let hello = try? await t.hello(link.host) else { return nil }
-          return Probe(endpoint: e, latencyMs: hello.latencyMs, upstreamOk: true)
+          do {
+            let hello = try await t.hello(link.host)
+            return (index, Probe(endpoint: e, latencyMs: hello.latencyMs, upstreamOk: true), nil)
+          } catch { return (index, nil, Self.diagnostic(error, at: e)) }
         }
       }
-      var result: [Probe] = []
-      for await p in group { if let p { result.append(p) } }
-      return result
+      var result: [(Int, Probe?, String?)] = []
+      for await attempt in group { result.append(attempt) }
+      return result.sorted { $0.0 < $1.0 }
     }
-    guard let e = Probe.preferred(choices)?.endpoint else { throw LinkError.noEndpoint }
+    guard let e = Probe.preferred(attempts.compactMap { $0.1 })?.endpoint else {
+      throw LinkError.probes(attempts.compactMap { $0.2 })
+    }
     let t = PinnedTransport(e, pin: link.pin)
     defer { t.close() }
-    let node = try await t.pair(link, name: UIDevice.current.model)
+    let node: PairedHost
+    do { node = try await t.pair(link, name: UIDevice.current.model) }
+    catch { throw LinkError.probes([Self.diagnostic(error, at: e)]) }
     let next = hosts.filter { $0.host.id != node.host.id } + [node]
     try KeychainStore.save(next)
     hosts = next
     pendingPair = nil
     select(node, asAnchor: true)
+  }
+  private nonisolated static func diagnostic(_ error: Error, at endpoint: Endpoint) -> String {
+    let e = error as NSError
+    let hint: String
+    switch (e.domain, e.code) {
+    case (NSURLErrorDomain, NSURLErrorNotConnectedToInternet), (NSURLErrorDomain, NSURLErrorDataNotAllowed):
+      hint = "检查当前网络，并在 iOS 设置中允许此 App 使用「本地网络」。"
+    case (NSURLErrorDomain, NSURLErrorTimedOut), (NSURLErrorDomain, NSURLErrorCannotConnectToHost):
+      hint = "检查宿主监听端口、防火墙，以及 iOS「本地网络」权限。"
+    case (NSURLErrorDomain, NSURLErrorCannotFindHost), (NSURLErrorDomain, NSURLErrorDNSLookupFailed):
+      hint = "检查主机名和 DNS。"
+    case (NSURLErrorDomain, NSURLErrorAppTransportSecurityRequiresSecureConnection), (NSURLErrorDomain, -1206 ... -1200):
+      hint = "检查 TLS 证书有效期、系统时间与 ATS 配置。"
+    default: hint = ""
+    }
+    return "\(endpoint.authority) — \(e.localizedDescription) [\(e.domain) \(e.code)] \(hint)"
   }
   private var checkpoint: (hostID: String, endpoint: Endpoint, request: HandoffRequest)?
   private var pendingClaim: (hostID: String, request: HandoffRequest, until: Double, inboxShown: Bool)?
@@ -380,6 +405,7 @@ struct NodeHealth: Sendable {
     case let .theme(dark, base):
       self.dark = dark
       bgBase = base
+    case let .ui(open): drawerOpen = open
     case let .ws(state): socket = state
     case .authExpired: webFailed(id)
     }

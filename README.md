@@ -11,10 +11,10 @@ npm --prefix plugin ci --ignore-scripts
 node scripts/check-privacy.mjs
 npm --prefix plugin test
 npm --prefix plugin run pack:plugin
-t3 plugin add build/t3-mobile-link-0.3.0.tgz
+t3 plugin add build/t3-mobile-link-0.4.1.tgz
 ```
 
-若宿主 CLI 报 `Missing required flag: --no-enable`，请运行 `t3 plugin add --no-enable=false --link=false build/t3-mobile-link-0.3.0.tgz`：显式选择复制并启用，效果相同。
+若宿主 CLI 报 `Missing required flag: --no-enable`，请运行 `t3 plugin add --no-enable=false --link=false build/t3-mobile-link-0.4.1.tgz`：显式选择复制并启用，效果相同。
 
 归档包含运行依赖及许可；安装端不运行包管理器、安装脚本或 OpenSSL 命令。到 **Settings → Plugins → Mobile Link** 开启监听，核对地址、扫码并通过独立可信渠道对照安全码。配对码有效五分钟、消费后不可复用，面板可换码或撤销设备。默认不监听；启用后默认所有 IPv4 接口、端口 3081、只读、无终端。限制监听网卡或使用受信网络与防火墙。`extraHosts` 和 `tunnels` 是额外公布的 TLS 地址，不创建隧道。TLS 必须端到端抵达同一已固定公钥的监听器。
 
@@ -25,7 +25,7 @@ t3 plugin add build/t3-mobile-link-0.3.0.tgz
 - 解析 `t3mobile://pair` 中的 `id`、`name`、`role`、`pin`、`code` 和逗号分隔的 `hosts`。**在发送任何凭据前**验证叶证书有效期和 DER SubjectPublicKeyInfo 的 SHA-256（base64url，无填充），并检查 `GET /mobile/v1/hello` 的主机 ID／指纹。严禁仅绕过系统 TLS 错误或将私有 CA 全局设为可信。
 - `POST /mobile/v1/pair` 发送 JSON `{code,name}` → `{deviceId,token,host,actions,terminal,family}`。令牌只应保存在系统 Keychain。以 Bearer 调用 `POST /mobile/v1/web-session`，将响应的 Secure/HttpOnly/Strict Cookie 放入专用 WKWebView cookie store，再加载 `/`。原生 HTTP、WebView 与 WSS **均需验证同一 pin**；不要将令牌放入 URL 或 JS。设备不要共享 WebView 存储。Cookie 一小时有效，重启不保留。
 - `GET /mobile/v1/sync` 返回认证后的宿主健康状态；`POST /mobile/v1/unpair` 撤销当前设备。两者接受 Bearer 或 Cookie。桌面管理面板不能经手机代理访问。
-- 页面提供 `window.__T3_MOBILE_BRIDGE__` 的 `toggleSidebar`、`openRoute`、`insertDraft`、`setKeyboard`、`reconnect`、`voiceEvent`。发往 WKScriptMessageHandler `t3Mobile` 的事件以 `type` 区分：`ready`、`theme`、`route`、`ws`、`auth-expired`。原生壳必须只接受已固定来源主框架的消息，并阻止不可信导航。
+- 页面提供 `window.__T3_MOBILE_BRIDGE__` 的 `toggleSidebar`、`openRoute`、`insertDraft`、`setKeyboard`、`reconnect`、`voiceEvent`。发往 WKScriptMessageHandler `t3Mobile` 的事件以 `type` 区分：`ready`、`theme`、`route`、`ws`、`auth-expired`，以及携带布尔字段 `drawerOpen` 的 `ui`。原生壳必须只接受已固定来源主框架的消息，并阻止不可信导航。
 
 ## Family 节点与撤销
 
@@ -70,3 +70,5 @@ CI 在 Windows/Linux 检查隐私、单元测试和打包。真实宿主验证�
 文件传输授权不等于在目标端执行 agent 的授权。需要续跑时，两端管理员先为同一个 `projectKey` 配置 `source-grants.json`，并在目标工作区条目显式设置 `"nativeHandoff": true`。两端都需启用 Mobile Link、`actions` 和 `taskSync`。目标需事先注册对应的原生项目并配置默认模型；`taskSync.autoContinue: false` 可强制只投递收件箱。本地工作区路径不会传给对端。
 
 接力先关闭源端插件写入，再使用原生中断及投影核对停止结果。只有已确认的停止或空闲观察、唯一领取和无冲突的源码版本都具备，目标才使用持久化命令 ID 派发原生 turn。源端失联时目标可以先领取并展示收件箱，**不会把心跳超时冒充 provider 已停止**；源端恢复并确认后才可升级到线程路由。此约束不禁止用户通过桌面主动发起新的独立操作。已发出的外部副作用不能靠中断撤销；`TOOL_OUTCOME_UNKNOWN` 要求先核验，再决定是否继续。
+
+个人构建可运行 `bash scripts/build-ipa.sh --icon /path/to/icon.png`，或设置 `T3MOBILE_ICON_PATH`。使用有权使用的 1024×1024 PNG。脚本在临时构建副本替换图标。

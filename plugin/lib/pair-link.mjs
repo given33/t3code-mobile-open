@@ -15,14 +15,23 @@ export function endpoint(s) {
     throw Error("Expected TLS host[:port]");
   return url.host;
 }
-export function hosts(cfg, port) {
+// Explicit admin routes remain available even when automatic discovery prefers LAN.
+export function hosts(cfg, port, interfaces = networkInterfaces()) {
   let ips = [cfg.host];
   if (cfg.host === "0.0.0.0" || cfg.host === "::") {
-    ips = Object.values(networkInterfaces())
-      .flat()
-      .filter((n) => n && !n["internal"] && n.family === "IPv4")
-      .map((n) => n.address);
-    if (!ips.length) ips = ["127.0.0.1"];
+    const candidates = Object.entries(interfaces).flatMap(([name, rows]) => {
+      if (/^(?:lo\d*|utun\d+)$|(?:clash|wintun|wireguard|tailscale|loopback|vEthernet|vmware|virtualbox|docker|veth|^br-|^tun\d|^tap\d|^meta$)/i.test(name)) return [];
+      return (rows ?? []).filter(n => !n["internal"] && n.family === "IPv4").map(n => n.address);
+    });
+    const lan = [], other = [];
+    for (const address of candidates) {
+      const [a, b] = address.split(".").map(Number);
+      if (a === 0 || a === 127 || a >= 224 || (a === 169 && b === 254) ||
+          (a === 198 && (b === 18 || b === 19))) continue;
+      const privateIP = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+      (privateIP ? lan : other).push(address);
+    }
+    ips = lan.length ? lan : other;
   }
   return [
     ...new Set(

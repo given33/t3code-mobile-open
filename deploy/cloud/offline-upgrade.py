@@ -43,7 +43,7 @@ def run(base, release, revert):
             raise ValueError('Unexpected path or ownership')
     versions = [json.loads((p / 'package.json').read_text())['version'] for p in [live, staged]]
     transition = tuple(reversed(versions)) if revert else tuple(versions)
-    if transition not in {('0.1.0', '0.2.0'), ('0.2.0', '0.3.0')}:
+    if transition not in {('0.1.0', '0.2.0'), ('0.2.0', '0.3.0'), ('0.3.0', '0.4.0')}:
         raise ValueError('Unexpected versions; refusing exchange')
     data = reg.read_bytes()
     rows = json.loads(data)

@@ -103,6 +103,7 @@ struct DictationSheet: View {
   @ObservedObject var model: AppModel
   let sessionID: UUID
   @StateObject private var voice = VoiceDictation()
+  @State private var inserting = false
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     NavigationStack {
@@ -127,10 +128,12 @@ struct DictationSheet: View {
               voice.message = "连接已改变，未插入草稿。"
               return
             }
+            inserting = true
             browser.insertDraft(voice.text) { ok in
+              inserting = false
               if ok { dismiss() } else { voice.message = "请先在网页中打开可编辑的输入框。" }
             }
-          }.disabled(voice.text.isEmpty)
+          }.disabled(voice.text.isEmpty || inserting)
         }
       }.navigationTitle("设备听写").toolbar { Button("关闭") { dismiss() } }
     }.onDisappear { voice.stop() }

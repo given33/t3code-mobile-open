@@ -16,7 +16,7 @@ import {
 } from "../plugin/test/helpers.mjs";
 const bin = realpathSync(process.argv[2]),
   tgz = fileURLToPath(
-    new URL("../build/t3-mobile-link-0.3.0.tgz", import.meta.url),
+    new URL("../build/t3-mobile-link-0.4.1.tgz", import.meta.url),
   );
 const home = temp(),
   t3Port = await port();
@@ -84,6 +84,10 @@ async function desktop(path, method = "GET", data) {
   return r;
 }
 try {
+  if (process.argv.includes("--mobile-ui")) {
+    const { configureMobileUI } = await import("./mobile-ui-e2e.mjs");
+    configureMobileUI(home.dir);
+  }
   try {
     await cli(["plugin", "add", tgz]);
     console.log("temporary home: plugin add exited 0");
@@ -208,7 +212,7 @@ try {
   assert.equal(sync.status, 200);
   assert.ok(sync.json().upstreamOk && sync.json().environmentId);
   console.log("sync: upstreamOk=true, environmentId present");
-  assert.equal(hello.json().appVersion, "0.3.0");
+  assert.equal(hello.json().appVersion, "0.4.1");
   const relay = await request("/mobile/v1/relay/status", {
     headers: { cookie },
   });
@@ -225,7 +229,7 @@ try {
     403,
   );
   console.log(
-    "relay: real panel, version 0.3.0, disabled by default, read-only handoff denied",
+    "relay: real panel, version 0.4.1, disabled by default, read-only handoff denied",
   );
   const auth = await request("/api/auth/session", { headers: { cookie } });
   assert.ok(auth.json().authenticated);
@@ -235,6 +239,13 @@ try {
   });
   assert.equal(shell.status, 200);
   console.log("native HTTP: authenticated read scope, orchestration shell 200");
+  if (process.argv.includes("--mobile-ui")) {
+    const { mobileUI } = await import("./mobile-ui-e2e.mjs");
+    await desktop(ext + "/api/config", "POST", { actions: true });
+    await mobileUI({ bin, origin, linkPort, pin, cookie, admin, workspace: home.dir,
+      environmentId: sync.json().environmentId });
+    await desktop(ext + "/api/config", "POST", { actions: false });
+  }
   ws = openWs(linkPort, pin, { cookie });
   await once(ws, "open", deadline());
   const msg = once(ws, "message", deadline());

@@ -117,9 +117,10 @@ public enum BridgeEvent: Codable, Equatable {
   case ready, authExpired
   case route(pathname: String, title: String)
   case theme(dark: Bool, bgBase: String)
+  case ui(drawerOpen: Bool)
   case ws(SocketState)
-  private enum Keys: String, CodingKey { case type, pathname, title, dark, bgBase, state }
-  private enum Kind: String, Codable { case ready, route, theme, ws, authExpired = "auth-expired" }
+  private enum Keys: String, CodingKey { case type, pathname, title, dark, bgBase, state, drawerOpen }
+  private enum Kind: String, Codable { case ready, route, theme, ui, ws, authExpired = "auth-expired" }
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
     switch try c.decode(Kind.self, forKey: .type) {
@@ -133,6 +134,7 @@ public enum BridgeEvent: Codable, Equatable {
       self = .theme(
         dark: try c.decode(Bool.self, forKey: .dark),
         bgBase: try c.decode(String.self, forKey: .bgBase))
+    case .ui: self = .ui(drawerOpen: try c.decode(Bool.self, forKey: .drawerOpen))
     case .ws: self = .ws(try c.decode(SocketState.self, forKey: .state))
     }
   }
@@ -150,6 +152,9 @@ public enum BridgeEvent: Codable, Equatable {
       kind = .theme
       try c.encode(dark, forKey: .dark)
       try c.encode(bg, forKey: .bgBase)
+    case let .ui(open):
+      kind = .ui
+      try c.encode(open, forKey: .drawerOpen)
     case let .ws(state):
       kind = .ws
       try c.encode(state, forKey: .state)

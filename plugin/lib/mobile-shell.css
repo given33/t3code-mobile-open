@@ -2,8 +2,37 @@
   --t3m-keyboard-inset: 0px;
   --t3m-keyboard-duration: 0ms;
 }
-body {
-  box-sizing: border-box;
-  padding-bottom: var(--t3m-keyboard-inset);
-  transition: padding-bottom var(--t3m-keyboard-duration) ease-out;
+@media (max-width: 767px) {
+  :root[data-t3m-native-nav] {
+    --t3m-content-height: calc(100dvh - var(--t3m-keyboard-inset));
+    background: var(--background);
+  }
+  [data-t3m-native-nav] body,
+  [data-t3m-native-nav] #root,
+  [data-t3m-native-nav] [data-slot="sidebar-wrapper"],
+  [data-t3m-native-nav] [data-slot="sidebar-inset"],
+  [data-t3m-native-nav] :is(.h-dvh, .h-svh, .h-screen) {
+    box-sizing: border-box;
+    height: var(--t3m-content-height) !important;
+    min-height: 0 !important;
+    min-width: 0;
+    transition: height var(--t3m-keyboard-duration) ease-out;
+  }
+  /* The host reserves a separate safe-area spacer below the composer. */
+  [data-t3m-native-nav] [data-chat-composer-stack] [aria-hidden="true"][class*="safe-area-inset-bottom"] {
+    height: 4px !important;
+  }
+  [data-t3m-native-nav] [data-slot="sidebar"][data-mobile="true"] {
+    width: min(82vw, 320px) !important;
+  }
+  [data-t3m-native-nav] body { margin: 0; overflow: hidden; }
+  [data-t3m-native-nav] [data-sidebar="trigger"] { display: none !important; }
+  [data-t3m-native-nav] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable="true"]) {
+    font-size: max(16px, 1em) !important;
+  }
+  [data-t3m-native-nav] :is(pre, [role="dialog"], [role="menu"], [role="listbox"]) {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+  [data-t3m-native-nav] pre { overflow-x: auto; }
 }

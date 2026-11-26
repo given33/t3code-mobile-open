@@ -1,7 +1,7 @@
 {
   "protocol": 1,
   "backend": "t3code",
-  "appVersion": "0.3.0",
+  "appVersion": "0.4.1",
   "host": {
     "id": "0ad089db-291f-44ec-bd6c-c3a99c1c7e9e",
     "name": "Desk",

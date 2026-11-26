@@ -9,6 +9,8 @@ struct Timed<Value> {
 enum LinkError: LocalizedError {
   case response
   case status(Int)
+  case pinRejected(String, Int)
+  case probes([String])
   case noEndpoint
   var errorDescription: String? {
     switch self {
@@ -17,6 +19,8 @@ enum LinkError: LocalizedError {
     case .status(403): return "请求被拒绝；配对码可能已失效。"
     case .status(429): return "请求过于频繁，请稍后重试。"
     case .status(let n): return "主机请求失败（\(n)）。"
+    case let .pinRejected(domain, code): return "TLS 校验失败。请核对证书有效期和宿主安全码。[\(domain) \(code)]"
+    case .probes(let attempts): return attempts.joined(separator: "\n\n")
     case .noEndpoint: return "没有可用的固定地址，请检查网络和主机。"
     }
   }
@@ -63,15 +67,28 @@ final class PinnedTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
     session = URLSession(configuration: c, delegate: self, delegateQueue: nil)
   }
   func close() { session.invalidateAndCancel() }
-  func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async
-    -> (URLSession.AuthChallengeDisposition, URLCredential?)
-  {
-    policy.decision(for: challenge)
+  // One transport is bound to a single authority and pin for its entire lifetime.
+  private let lock = NSLock()
+  private var rejectedTrust = false
+  private func trustWasRejected() -> Bool {
+    lock.lock(); defer { lock.unlock() }
+    return rejectedTrust
   }
-  func urlSession(
-    _ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge
-  ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-    policy.decision(for: challenge)
+  private func respond(_ challenge: URLAuthenticationChallenge,
+                       _ completion: (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    let (disposition, credential) = policy.decision(for: challenge)
+    if disposition == .cancelAuthenticationChallenge && challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+      lock.lock(); rejectedTrust = true; lock.unlock()
+    }
+    completion(disposition, credential)
+  }
+  func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+                  completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    respond(challenge, completionHandler)
+  }
+  func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
+                  completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    respond(challenge, completionHandler)
   }
   func urlSession(
     _ session: URLSession, task: URLSessionTask,
@@ -93,7 +110,15 @@ final class PinnedTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
       req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
     }
     let start = ProcessInfo.processInfo.systemUptime
-    let (data, response) = try await session.data(for: req)
+    let data: Data, response: URLResponse
+    do { (data, response) = try await session.data(for: req) }
+    catch {
+      if trustWasRejected() {
+        let underlying = error as NSError
+        throw LinkError.pinRejected(underlying.domain, underlying.code)
+      }
+      throw error
+    }
     guard let http = response as? HTTPURLResponse, http.url == u else { throw LinkError.response }
     guard http.statusCode == 200 else { throw LinkError.status(http.statusCode) }
     let value = try JSONDecoder().decode(type, from: data)

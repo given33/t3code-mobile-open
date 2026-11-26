@@ -29,7 +29,7 @@ targets:
         INFOPLIST_FILE: T3Mobile/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MARKETING_VERSION: '0.3.0'
+        MARKETING_VERSION: '0.4.1'
         CURRENT_PROJECT_VERSION: 1
 schemes:
   T3Mobile:

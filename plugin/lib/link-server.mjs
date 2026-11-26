@@ -144,6 +144,7 @@ export class LinkServer {
   }
   async start() {
     if (this.server) return;
+    this.ident = identity(this.dir);
     const s = https.createServer(
       {
         key: this.ident.key,
@@ -201,6 +202,16 @@ export class LinkServer {
         resolve();
       });
     });
+    // Also renew uninterrupted, long-running listeners without dropping established sockets.
+    const renew = setInterval(() => {
+      try {
+        const next = identity(this.dir);
+        if (next.fingerprint !== this.ident.fingerprint) throw Error("Identity changed on disk");
+        if (next.cert !== this.ident.cert) s.setSecureContext({ key: next.key, cert: next.cert });
+        this.ident = next;
+      } catch { console.error("Mobile Link certificate refresh failed; check identity state."); }
+    }, 24 * 60 * 60 * 1000).unref();
+    s.once("close", () => clearInterval(renew));
     this.server = s;
     this.pair.refresh();
   }
@@ -269,10 +280,13 @@ export class LinkServer {
       address = req.socket.remoteAddress;
     if (m === "GET" && path === "/mobile/v1/hello") {
       this.helloLimit.take(address);
+      const authenticated = Boolean(req.headers.authorization || req.headers.cookie);
+      if (authenticated) this.devices.auth(req.headers);
       return send(res, 200, {
         protocol: 1,
         backend: "t3code",
         appVersion,
+        ...(authenticated ? { family: familyRoute(this.dir) } : {}),
         host: this.host(),
         fingerprint: this.ident.fingerprint,
       });

@@ -95,7 +95,7 @@ sudo -nu t3-cloud timeout 25 python3 -I - < verify-codex-mux.py
 
 ### 老版管理器没有 `plugin update` 时
 
-`plugin add` 返回 `Plugin is already installed` 时，不要 `remove` 再安装（会危及状态/配置）。先在服务用户私有的 `BASE/mobile-link-release.<随机>/` 中保留旧包、已校验 SHA-256 的 `new.tgz`；用 `T3CODE_HOME=RELEASE/stage` 调同一宿主 CLI 安装新包。仅对 **非 link 的相邻版本 0.1.0 → 0.2.0 或 0.2.0 → 0.3.0**，`offline-upgrade.py` 可在停止目标服务后由该服务用户运行 `python3 -I offline-upgrade.py apply BASE RELEASE`：在同一文件系统原子交换包目录，并备份、替换目标 registry 条目的版本与包来源，保留 `enabled`、`config` 和其他所有条目。不读取或移动插件 state，不改 Nginx。随后重启目标服务并独立验证身份、pin、版本、角色。若验证失败，停止目标服务后立即以相同参数执行 `rollback`，再启动；若之后已有其他配置更改，不应直接恢复旧 registry。不要覆盖原始备份。网关通过仍保持原 SNI 并在发 HTTP 前校验旧 pin 的探针验收；分别报告默认 DNS 和指定已验证公网地址的结果。
+`plugin add` 返回 `Plugin is already installed` 时，不要 `remove` 再安装（会危及状态/配置）。先在服务用户私有的 `BASE/mobile-link-release.<随机>/` 中保留旧包、已校验 SHA-256 的 `new.tgz`；用 `T3CODE_HOME=RELEASE/stage` 调同一宿主 CLI 安装新包。仅对 **非 link 的相邻版本 0.1.0 → 0.2.0、0.2.0 → 0.3.0 或 0.3.0 → 0.4.0**，`offline-upgrade.py` 可在停止目标服务后由该服务用户运行 `python3 -I offline-upgrade.py apply BASE RELEASE`：在同一文件系统原子交换包目录，并备份、替换目标 registry 条目的版本与包来源，保留 `enabled`、`config` 和其他所有条目。不读取或移动插件 state，不改 Nginx。随后重启目标服务并独立验证身份、pin、版本、角色。若验证失败，停止目标服务后立即以相同参数执行 `rollback`，再启动；若之后已有其他配置更改，不应直接恢复旧 registry。不要覆盖原始备份。网关通过仍保持原 SNI 并在发 HTTP 前校验旧 pin 的探针验收；分别报告默认 DNS 和指定已验证公网地址的结果。
 
 ### 0.3.0：按工作区启用原生接力
 

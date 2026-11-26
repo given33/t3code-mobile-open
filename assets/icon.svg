@@ -1,4 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#c026d3"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">TM</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="1024" height="1024">
+  <defs>
+    <linearGradient id="night" x2=".8" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#273748"/><stop offset="1" stop-color="#0b1624"/>
+    </linearGradient>
+    <linearGradient id="signal" x2="1" y2="1">
+      <stop stop-color="#c1ffe5"/><stop offset="1" stop-color="#45d3bb"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#night)" d="M0 0h128v128H0z"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="11">
+    <path stroke="url(#signal)" d="m67 40 8-8a19 19 0 0 1 27 27L84 77a19 19 0 0 1-27 0"/>
+    <path stroke="#effaf7" d="m61 88-8 8a19 19 0 0 1-27-27l18-18a19 19 0 0 1 27 0"/>
+  </g>
 </svg>

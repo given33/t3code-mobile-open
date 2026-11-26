@@ -15,8 +15,10 @@
   <key>NSPhotoLibraryUsageDescription</key><string>选择你要附加到当前网页的图片。</string>
   <key>NSMicrophoneUsageDescription</key><string>在你开始听写时录制语音以填写草稿。</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>在本设备上将听写内容转为可编辑的文字。</string>
-  <key>NSAppTransportSecurity</key><dict><key>NSExceptionDomains</key><dict>
-    <key>t3-cloud.sslip.io</key><dict><key>NSIncludesSubdomains</key><false/><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/><key>NSExceptionDomains</key><dict>
+    <key>t3-cloud.sslip.io</key><dict><key>NSIncludesSubdomains</key><true/><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+    <key>0.0.0.0/0</key><dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+    <key>::/0</key><dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
   </dict></dict>
   <key>UILaunchScreen</key><dict><key>UIColorName</key><string>LaunchSurface</string></dict>
   <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>

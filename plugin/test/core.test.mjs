@@ -4,8 +4,8 @@ import { X509Certificate, createHash, createPrivateKey } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { temp } from "./helpers.mjs";
-import { identity } from "../lib/identity.mjs";
-import { PairCode } from "../lib/pair-link.mjs";
+import { identity, issueCertificate } from "../lib/identity.mjs";
+import { hosts, PairCode } from "../lib/pair-link.mjs";
 import { Devices } from "../lib/devices.mjs";
 import { familyRoute } from "../lib/family.mjs";
 import { digest, writeState } from "../lib/state.mjs";
@@ -36,6 +36,37 @@ test("identity: stable P-256 self-signature, private key match, independent SPKI
   assert.equal(identity(h.dir).fingerprint, i.fingerprint);
   writeFileSync(join(h.dir, "identity.json"), "{");
   assert.throws(() => identity(h.dir));
+});
+test("migrate legacy lifetime, renew near expiry and preserve pairing identity", t => {
+  const h = temp(); t.after(h.clean);
+  const day = 86_400_000, now = Date.UTC(2026, 0, 1);
+  const original = identity(h.dir, now);
+  const key = createPrivateKey(original.key);
+  const legacy = issueCertificate(key, now - day, now + 1825 * day);
+  writeState(h.dir, "identity.json", {id: original.id, key: original.key, cert: legacy});
+  const migrated = identity(h.dir, now);
+  const cert = new X509Certificate(migrated.cert), end = Date.parse(cert.validTo);
+  assert.equal(end - Date.parse(cert.validFrom), 397 * day);
+  assert.notEqual(migrated.cert, legacy);
+  assert.equal(identity(h.dir, end - 45 * day).cert, migrated.cert);
+  const renewed = identity(h.dir, end - 45 * day + 1000);
+  assert.notEqual(renewed.cert, migrated.cert);
+  for (const data of [migrated, renewed, identity(h.dir, end + 1000 * day)]) {
+    assert.ok(data.key === original.key && data.id === original.id && data.fingerprint === original.fingerprint);
+    assert.ok(new X509Certificate(data.cert).checkPrivateKey(key));
+  }
+});
+
+test("QR discovery prefers LAN and explicit routes; excludes benchmark, link-local and virtual interfaces", () => {
+  const addr = (...octets) => ({family:"IPv4", address:octets.join("."), internal:false});
+  const config = {host:"0.0.0.0", extraHosts:["example.com"], tunnels:["example.net:444"]};
+  const virtual = {Meta:[addr(198,18,0,1)], Ethernet:[addr(198,19,255,254),addr(169,254,1,2)],
+    "vEthernet (WSL)": [addr(172,20,0,1)]};
+  const explicit = ["example.com", "example.net:444"];
+  assert.deepEqual(hosts(config, 3081, virtual), explicit);
+  assert.deepEqual(hosts(config, 3081, {...virtual, WiFi:[addr(192,168,1,20),addr(203,0,113,1)]}),
+    [...explicit,"192.168.1.20:3081"]);
+  assert.deepEqual(hosts(config, 3081, {...virtual, WAN:[addr(203,0,113,1)]}), [...explicit,"203.0.113.1:3081"]);
 });
 test("pair URI, SVG, one-time use, rotation, fixed expiry and bounded attempts", () => {
   let now = 1000;

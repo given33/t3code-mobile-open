@@ -46,6 +46,7 @@ test("Swift paths, response fixtures and cookie match an actual pinned LinkServe
   const req = async (n, opts) => { const r = await mobile(p,svc.ident.fingerprint,constant(n),opts); assert.equal(r.status,200); return r; };
   const hello = (await req("hello")).json(), pair = (await req("pair",{method:"POST",body:{code:svc.pair.code,name:"Phone"}})).json();
   const headers = {authorization:"Bearer " + pair.token};
+  assert.deepEqual((await req("hello", {headers})).json().family, fixture("sync").family);
   const web = await req("webSession",{method:"POST",headers}), sync = (await req("sync",{headers})).json();
   // Substitute only runtime values, never delete a key. Extra, missing, renamed and mistyped fields fail.
   const host = {...fixture("hello").host,id:svc.ident.id};
@@ -62,12 +63,15 @@ test("Swift paths, response fixtures and cookie match an actual pinned LinkServe
 });
 
 test("real mobile shell posts the Swift event fixture to the Swift handler; native calls have matching signatures", async () => {
-  const messages = [], callbacks = new Map();
+  const messages = [], callbacks = new Map(), body = {};
+  let drawer = null, notifyDrawer;
   const root = {classList:{contains:()=>true},style:{setProperty(){}}};
   class WS { constructor(url) { this.url = url; } addEventListener(k,f) { callbacks.set(k,f); } }
   const window = {WebSocket:WS, webkit:{messageHandlers:{[constant("handler")]:{postMessage:m=>messages.push(m)}}}, fetch:async()=>({status:401,url:"https://example.com/"})};
-  vm.runInNewContext(shellJs,{window,URL,location:new URL("https://example.com/thread"),document:{title:"Thread",documentElement:root,head:{}},
-    history:{pushState(){},replaceState(){}},addEventListener(){},MutationObserver:class {observe(){}},getComputedStyle:()=>({getPropertyValue:()=>"#222222"})});
+  vm.runInNewContext(shellJs,{window,URL,location:new URL("https://example.com/thread"),document:{title:"Thread",documentElement:root,head:{},body,querySelector:()=>drawer},
+    history:{pushState(){},replaceState(){}},addEventListener(){},MutationObserver:class {constructor(cb){this.cb=cb} observe(el){if(el===body) notifyDrawer=this.cb}},getComputedStyle:()=>({getPropertyValue:()=>"#222222"})});
+  drawer = {}; notifyDrawer(); notifyDrawer();
+  drawer = null; notifyDrawer();
   new window.WebSocket("wss://example.com/ws"); callbacks.get("open")(); callbacks.get("close")(); await window.fetch("/");
   assert.deepEqual(JSON.parse(JSON.stringify(messages)),fixture("events"));
   const bridge = window.__T3_MOBILE_BRIDGE__, view = source("ios/T3Mobile/App/OfficialWebView.swift");

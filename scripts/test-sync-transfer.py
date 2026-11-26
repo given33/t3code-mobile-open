@@ -59,18 +59,23 @@ class TransferTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform.startswith('linux'), 'renameat2 exchange is Linux-only')
     def test_offline_native_handoff_upgrade_and_rollback(self):
+        for source, target in [('0.2.0', '0.3.0'), ('0.3.0', '0.4.0')]:
+            with self.subTest(source=source, target=target):
+                self.assert_offline_exchange(source, target)
+
+    def assert_offline_exchange(self, source, target):
         upgrade = helper.with_name('offline-upgrade.py')
         with tempfile.TemporaryDirectory() as root:
             base = Path(root).resolve()
             release = base / 'mobile-link-release.fixture'
             old = base / 'userdata/plugins'
             stage = release / 'stage/userdata/plugins'
-            for directory, version in [(old, '0.2.0'), (stage, '0.3.0')]:
+            for directory, version in [(old, source), (stage, target)]:
                 package = directory / 'packages/t3-mobile-link'
                 package.mkdir(parents=True)
                 (package / 'package.json').write_text(json.dumps({'version': version}))
             config = {'actions': False, 'taskSync': {'enabled': False}}
-            row = {'id': 't3-mobile-link', 'version': '0.2.0', 'linked': False, 'enabled': True,
+            row = {'id': 't3-mobile-link', 'version': source, 'linked': False, 'enabled': True,
                    'installPath': str(old / 'packages/t3-mobile-link'), 'config': config}
             other = {'id': 'unrelated', 'config': {'enabled': True}}
             registry = old / 'registry.json'
@@ -86,13 +91,13 @@ class TransferTests(unittest.TestCase):
             apply('apply')
             installed = json.loads(registry.read_bytes())
             self.assertEqual(installed[0], other)
-            self.assertEqual(installed[1]['version'], '0.3.0')
+            self.assertEqual(installed[1]['version'], target)
             self.assertEqual(installed[1]['config'], config)
-            self.assertEqual(json.loads((old / 'packages/t3-mobile-link/package.json').read_text())['version'], '0.3.0')
+            self.assertEqual(json.loads((old / 'packages/t3-mobile-link/package.json').read_text())['version'], target)
             self.assertEqual(sentinel.read_text(), 'preserve')
             apply('rollback')
             self.assertEqual(registry.read_bytes(), previous)
-            self.assertEqual(json.loads((old / 'packages/t3-mobile-link/package.json').read_text())['version'], '0.2.0')
+            self.assertEqual(json.loads((old / 'packages/t3-mobile-link/package.json').read_text())['version'], source)
             self.assertEqual(sentinel.read_text(), 'preserve')
 
 

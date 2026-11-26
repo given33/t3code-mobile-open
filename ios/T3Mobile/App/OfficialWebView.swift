@@ -15,7 +15,6 @@ import WebKit
     config.userContentController.add(WeakScriptMessageHandler(c), name: Wire.handler)
     let args = [
       "origin": session.origin.absoluteString, "route": model.route(session),
-      "bg": Theme.hex(model.bgBase, dark: model.dark),
     ]
     let json = String(decoding: (try? JSONEncoder().encode(args)) ?? Data("{}".utf8), as: UTF8.self)
     let script = """
@@ -23,8 +22,8 @@ import WebKit
         const v = \(json);
         if (location.origin !== v.origin) return;
         const root = document.documentElement;
-        root?.setAttribute('data-t3m-native-nav', '');
-        if (root) root.style.backgroundColor = v.bg;
+        const mark = () => document.documentElement?.setAttribute('data-t3m-native-nav', '');
+        if (root) mark(); else document.addEventListener('DOMContentLoaded', mark, {once:true});
         const key = 't3m-restored-this-session', session = '\(session.id.uuidString)';
         if (location.pathname === '/' && v.route !== '/' && sessionStorage.getItem(key) !== session) {
           sessionStorage.setItem(key, session);
@@ -36,9 +35,14 @@ import WebKit
       WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let view = WKWebView(frame: .zero, configuration: config)
     // iOS WebKit presents the system picker for HTML file inputs; do not override its open panel.
+    view.uiDelegate = c
+    view.scrollView.delegate = c
+    view.scrollView.bounces = false
+    view.scrollView.contentInsetAdjustmentBehavior = .never
     view.navigationDelegate = c
     view.isOpaque = false
     view.scrollView.keyboardDismissMode = .interactive
+    view.allowsBackForwardNavigationGestures = false
     view.allowsLinkPreview = false
     view.underPageBackgroundColor = Theme.surface(model.bgBase, dark: model.dark)
     c.attach(view)
@@ -52,7 +56,7 @@ import WebKit
   }
 
   @MainActor
-  final class Coordinator: NSObject, WKNavigationDelegate, WKDownloadDelegate,
+  final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, UIScrollViewDelegate, WKDownloadDelegate,
     WKScriptMessageHandler, QLPreviewControllerDataSource, QLPreviewControllerDelegate
   {
     weak var model: AppModel?, view: WKWebView?
@@ -110,6 +114,8 @@ import WebKit
       boot?.cancel()
       NotificationCenter.default.removeObserver(self)
       v.stopLoading()
+      v.uiDelegate = nil
+      v.scrollView.delegate = nil
       v.navigationDelegate = nil
       v.configuration.userContentController.removeScriptMessageHandler(forName: Wire.handler)
       if model?.browser === self { model?.browser = nil }
@@ -156,10 +162,72 @@ import WebKit
       let (disposition, credential) = policy.decision(for: challenge)
       completionHandler(disposition, credential)
     }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+      if scrollView.zoomScale <= 1.01, scrollView.contentOffset != .zero {
+        scrollView.setContentOffset(.zero, animated: false)
+      }
+    }
+    private func userLink(_ action: WKNavigationAction, in view: WKWebView) -> URL? {
+      guard action.sourceFrame.isMainFrame, s.endpoint.matches(action.sourceFrame.request.url),
+        action.navigationType == .linkActivated, trusted(view), let url = action.request.url,
+        url.scheme?.lowercased() == "https", url.host != nil, url.user == nil, url.password == nil
+      else { return nil }
+      return url
+    }
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+      guard action.targetFrame == nil, let url = userLink(action, in: webView) else { return nil }
+      if s.endpoint.matches(url) { webView.load(action.request) }
+      else { UIApplication.shared.open(url) }
+      return nil
+    }
+    private func dialogPresenter(_ frame: WKFrameInfo, _ webView: WKWebView) -> UIViewController? {
+      guard frame.isMainFrame, s.endpoint.matches(frame.request.url), trusted(webView),
+        let presenter = webView.window?.rootViewController, presenter.presentedViewController == nil
+      else { return nil }
+      return presenter
+    }
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+      guard let presenter = dialogPresenter(frame, webView) else { completionHandler(); return }
+      let dialog = UIAlertController(title: s.endpoint.authority, message: message, preferredStyle: .alert)
+      dialog.addAction(UIAlertAction(title: "好", style: .default) { _ in completionHandler() })
+      presenter.present(dialog, animated: true)
+    }
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+      guard let presenter = dialogPresenter(frame, webView) else { completionHandler(false); return }
+      let dialog = UIAlertController(title: s.endpoint.authority, message: message, preferredStyle: .alert)
+      dialog.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(false) })
+      dialog.addAction(UIAlertAction(title: "确认", style: .default) { _ in completionHandler(true) })
+      presenter.present(dialog, animated: true)
+    }
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+      guard let presenter = dialogPresenter(frame, webView) else { completionHandler(nil); return }
+      let dialog = UIAlertController(title: s.endpoint.authority, message: prompt, preferredStyle: .alert)
+      dialog.addTextField { $0.text = defaultText }
+      dialog.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(nil) })
+      dialog.addAction(UIAlertAction(title: "好", style: .default) { [weak dialog] _ in
+        completionHandler(dialog?.textFields?.first?.text ?? "")
+      })
+      presenter.present(dialog, animated: true)
+    }
     func webView(
       _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
       decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
+      if (action.targetFrame == nil || action.targetFrame?.isMainFrame == true),
+        let url = userLink(action, in: webView), !s.endpoint.matches(url) {
+        decisionHandler(.cancel)
+        UIApplication.shared.open(url)
+        return
+      }
+      if action.targetFrame == nil {
+        decisionHandler(userLink(action, in: webView) == nil ? .cancel : .allow)
+        return
+      }
       guard current, let u = action.request.url, s.endpoint.matches(u),
         action.targetFrame?.isMainFrame == true,
         action.sourceFrame.isMainFrame
@@ -237,9 +305,9 @@ import WebKit
         "return window.__T3_MOBILE_BRIDGE__?.insertDraft(text)", args: ["text": text], done: done)
     }
     @objc private func keyboard(_ note: Notification) {
-      guard let view, let screen = view.window?.screen, let info = note.userInfo,
-        let rect = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+      guard let view, let screen = view.window?.screen, let info = note.userInfo
       else { return }
+      let rect = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .null
       let local = view.convert(rect, from: screen.coordinateSpace)
       let intersection = view.bounds.intersection(local)
       let overlap =

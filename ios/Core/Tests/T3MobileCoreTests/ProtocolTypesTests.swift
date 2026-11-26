@@ -35,11 +35,13 @@ final class ProtocolTypesTests: XCTestCase {
       events,
       [
         .ready, .route(pathname: "/thread", title: "Thread"), .theme(dark: true, bgBase: "#222222"),
+        .ui(drawerOpen: false), .ui(drawerOpen: true), .ui(drawerOpen: false),
         .ws(.connecting), .ws(.connected), .ws(.disconnected), .authExpired,
       ])
     XCTAssertEqual(try d.decode([BridgeEvent].self, from: JSONEncoder().encode(events)), events)
     for s in [
       #"{"type":"ws","state":"up"}"#, #"{"type":"theme","dark":true}"#, #"{"type":"unknown"}"#,
+      #"{"type":"ui"}"#, #"{"type":"ui","drawerOpen":"false"}"#,
     ] {
       XCTAssertThrowsError(try d.decode(BridgeEvent.self, from: Data(s.utf8)))
     }
